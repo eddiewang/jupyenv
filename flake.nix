@@ -36,37 +36,40 @@
   inputs.rust-overlay.inputs.flake-utils.follows = "flake-utils";
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
 
-  outputs = {
-    self,
-    nixpkgs,
-    nixpkgs-stable,
-    flake-compat,
-    flake-utils,
-    ihaskell,
-    nix-dart,
-    npmlock2nix,
-    opam-nix,
-    pre-commit-hooks,
-    poetry2nix,
-    rust-overlay,
-  }: let
-    inherit (nixpkgs) lib;
+  outputs =
+    { self
+    , nixpkgs
+    , nixpkgs-stable
+    , flake-compat
+    , flake-utils
+    , ihaskell
+    , nix-dart
+    , npmlock2nix
+    , opam-nix
+    , pre-commit-hooks
+    , poetry2nix
+    , rust-overlay
+    ,
+    }:
+    let
+      inherit (nixpkgs) lib;
 
-    SYSTEMS = [
-      flake-utils.lib.system.x86_64-linux
-      # TODO - Fix linux first and then get macos working.
-      # flake-utils.lib.system.x86_64-darwin
-    ];
+      SYSTEMS = [
+        flake-utils.lib.system.x86_64-linux
+        # TODO - Fix linux first and then get macos working.
+        flake-utils.lib.system.x86_64-darwin
+      ];
 
-    kernelLib = import ./lib/kernels.nix {inherit self lib;};
-  in
+      kernelLib = import ./lib/kernels.nix { inherit self lib; };
+    in
     (flake-utils.lib.eachSystem SYSTEMS (
-      system: let
+      system:
+      let
         pkgs = nixpkgs.legacyPackages.${system};
 
         python = pkgs.python3;
-        poetry2nixPkgs = import "${poetry2nix}/default.nix" {inherit pkgs poetry;};
-        poetry = pkgs.callPackage "${poetry2nix}/pkgs/poetry" {inherit python;};
+        poetry2nixPkgs = import "${poetry2nix}/default.nix" { inherit pkgs poetry; };
+        poetry = pkgs.callPackage "${poetry2nix}/pkgs/poetry" { inherit python; };
 
         baseArgs = {
           inherit self system;
@@ -78,11 +81,11 @@
             alejandra.enable = true;
             typos = {
               enable = true;
-              types = ["file"];
+              types = [ "file" ];
               files = "\\.((txt)|(md)|(nix)|\\d)$";
             };
           };
-          excludes = ["^\\.jupyter/"]; # JUPYTERLAB_DIR
+          excludes = [ "^\\.jupyter/" ]; # JUPYTERLAB_DIR
           settings = {
             typos.write = true;
           };
@@ -90,47 +93,48 @@
 
         update-poetry-lock =
           pkgs.writeShellApplication
-          {
-            name = "update-poetry-lock";
-            runtimeInputs = [poetry];
-            text = ''
-              shopt -s globstar
-              for lock in **/poetry.lock; do
-              (
-                echo Updating "$lock"
-                cd "$(dirname "$lock")"
-                poetry update
-              )
-              done
-            '';
-          };
+            {
+              name = "update-poetry-lock";
+              runtimeInputs = [ poetry ];
+              text = ''
+                shopt -s globstar
+                for lock in **/poetry.lock; do
+                (
+                  echo Updating "$lock"
+                  cd "$(dirname "$lock")"
+                  poetry update
+                )
+                done
+              '';
+            };
 
         jupyenvLib = lib.makeScope lib.callPackageWith (final: {
           inherit self system pkgs lib python nix-dart baseArgs kernelLib;
-          docsLib = final.callPackage ./lib/docs.nix {};
-          jupyterLib = final.callPackage ./lib/jupyter.nix {};
+          docsLib = final.callPackage ./lib/docs.nix { };
+          jupyterLib = final.callPackage ./lib/jupyter.nix { };
         });
         inherit (jupyenvLib) docsLib jupyterLib;
 
-        examples = kernelLib.mapKernelsFromPath (self + /examples) ["example"];
+        examples = kernelLib.mapKernelsFromPath (self + /examples) [ "example" ];
         exampleJupyterlabKernelsNew = (
           lib.mapAttrs'
-          (
-            name: value:
-              lib.nameValuePair
-              ("jupyterlab-kernel-" + name)
-              (jupyterLib.mkJupyterlabNew value)
-          )
-          examples
+            (
+              name: value:
+                lib.nameValuePair
+                  ("jupyterlab-kernel-" + name)
+                  (jupyterLib.mkJupyterlabNew value)
+            )
+            examples
         );
 
         exampleJupyterlabAllKernelsNew =
           jupyterLib.mkJupyterlabNew (builtins.attrValues examples);
-      in {
+      in
+      {
         lib =
           jupyterLib
           // kernelLib
-          // {};
+          // { };
         packages =
           {
             jupyterlab-new = jupyterLib.mkJupyterlabNew ./config.nix;
@@ -163,7 +167,7 @@
         apps = {
           update-poetry-lock =
             flake-utils.lib.mkApp
-            {drv = self.packages."${system}".update-poetry-lock;};
+              { drv = self.packages."${system}".update-poetry-lock; };
         };
       }
     ))
